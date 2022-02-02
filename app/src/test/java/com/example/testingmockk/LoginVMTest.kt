@@ -10,9 +10,7 @@ class LoginVMTest : TestCase() {
     @Test
     fun testLogin() {
         val loginUseCase = mockk<ILoginUseCase>()
-
         val viewModel = LoginVM(loginUseCase)
-
         val result = viewModel.login("", "")
         Assert.assertEquals(false, result)
 
@@ -52,45 +50,30 @@ class LoginVMTest : TestCase() {
     fun testReturnValuePrivateMethod() {
         val loginUseCase = mockk<ILoginUseCase>()
         val viewModel = spyk(LoginVM(loginUseCase), recordPrivateCalls = true)
-        val privateMethodValue = slot<Boolean>()
-        val arg = slot<String>()
-        every { viewModel["isFormValid"](capture(arg), any<String>()) } answers {
-            val result = callOriginal()
-            privateMethodValue.captured = result as Boolean
-            privateMethodValue.isCaptured = true
-            result
+        var returnValue: Boolean? = null
+        every { viewModel["isFormValid"](any<String>(), any<String>()) } answers {
+            returnValue = callOriginal() as Boolean
+            return@answers returnValue
         }
-
-        println("is Slot captured before method call = ${privateMethodValue.isCaptured}")
-        val result = viewModel.login("david@gmail", "Test@123")
-
-        println("is Slot captured after method call = ${privateMethodValue.isCaptured}")
-
-        Assert.assertEquals(false, result)
-        verify {
-            viewModel.login(any(), any())
-        }
-        verify {
-            viewModel["isFormValid"](any<String>(), any<String>())
-        }
-        assertEquals(privateMethodValue.captured, false)
+        viewModel.login("david", "123")
+        assertEquals(false, returnValue!!)
 
         //todo discuss: Should I unit test private methods?
     }
 
     @Test
     fun testCaptureArguments() {
-        val loginUseCase = mockk<ILoginUseCase>()
-        val viewModel = spyk(LoginVM(loginUseCase), recordPrivateCalls = true)
+        val loginUseCase = mockk<ILoginUseCase>(relaxed = true)
+        val viewModel = LoginVM(loginUseCase)
         val captureEmailArg = mutableListOf<String>()
 
 
-        viewModel.login("david@gmail", "Test@123")
-        viewModel.login("davi@gmail", "Test@123")
-        viewModel.login("dav@gmail", "Test@123")
+        viewModel.login("david@gmail.com", "Test@123")
+        viewModel.login("davi@gmail.com", "Test@123")
+        viewModel.login("dav@gmail.com", "Test@123")
 
         verify {
-            viewModel.login(capture(captureEmailArg), any())
+            loginUseCase.login(capture(captureEmailArg), any())
         }
 
         println(captureEmailArg)
@@ -131,28 +114,25 @@ class LoginVMTest : TestCase() {
         every { loginUseCase.login(any(), any()) } returnsMany listOf(false, true, false, true)
 
         val viewModel = spyk(LoginVM(loginUseCase))
-        assertEquals(viewModel.login("david@gmail.com", "Test@123"), false)
-        assertEquals(viewModel.login("david@gmail.com", "Test@123"), true)
-        assertEquals(viewModel.login("david@gmail.com", "Test@123"), false)
-        assertEquals(viewModel.login("david@gmail.com", "Test@123"), true)
-        assertEquals(viewModel.login("david@gmail.com", "Test@123"), true)
+        assertEquals(false, viewModel.login("david@gmail.com", "Test@123"))
+        assertEquals(true, viewModel.login("david@gmail.com", "Test@123"))
+        assertEquals(false, viewModel.login("david@gmail.com", "Test@123"))
+        assertEquals(true, viewModel.login("david@gmail.com", "Test@123"))
+        assertEquals(true, viewModel.login("david@gmail.com", "Test@123"))
     }
 
     @Test
     fun testMockingBehaviour3() {
-        val loginUseCase = mockk<ILoginUseCase>(relaxed = true)
-        // note that the last value will be the default after exhausting the function call
+        val loginUseCase = mockk<ILoginUseCase>()
         every { loginUseCase.login(any(), any()) } answers {
             val email: String = arg(0)
             val password: String = arg(1)
 
             email == "david@gmail.com" && password == "Test@123"
         }
-        val viewModel = spyk(LoginVM(loginUseCase))
-
-
-        assertEquals(viewModel.login("david@gmail.com", "Test@123"), true)
-        assertEquals(viewModel.login("davi@gmail.com", "Test@123"), false)
-        assertEquals(viewModel.login("david@gmail.com", "Test@23"), false)
+        val viewModel = LoginVM(loginUseCase)
+        assertEquals(true, viewModel.login("david@gmail.com", "Test@123"))
+        assertEquals(false, viewModel.login("davi@gmail.com", "Test@123"))
+        assertEquals(false, viewModel.login("david@gmail.com", "Test@23"))
     }
 }
